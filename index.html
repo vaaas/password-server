@@ -115,6 +115,11 @@
     <script>
         let password = null
 
+        function empty(x) {
+            while(x.firstChild) x.firstChild.remove()
+            return x
+        }
+
         function post(url, data) {
             return fetch(url, {
                 method: 'POST',
@@ -138,6 +143,8 @@
         }
 
         const pluck = k => x => x[k]
+        const has = a => b => b.includes(a)
+        const inside = a => b => a.includes(b)
 
         function E(name, attrs=null, children=null) {
             const elem = document.createElement(name)
@@ -186,7 +193,10 @@
         }
 
         function App(elem) {
-            const header_bar = HeaderBar()
+            const header_bar = HeaderBar().oninputchange(x => {
+                if (typeof main_view.view.search === 'function')
+                    main_view.view.search(x)
+            })
             const main_view = MainView().set_view(PasswordListing())
             self.main_view = main_view
 
@@ -203,7 +213,11 @@
             const me = E('header', null, [ new_password, title, input ])
             me.new_password = new_password
             me.input = input
-            return me
+            return extend(me, HeaderBar.prototype)
+        }
+        HeaderBar.prototype.oninputchange = function(f) {
+            this.input.onchange = () => f(this.input.value)
+            return this
         }
 
         function MainView() {
@@ -300,20 +314,37 @@
 
         function PasswordListing() {
             const me = E('div')
-            const fields = [
+            me.fields = [
                 { key: 'title', label: 'Title', },
                 { key: 'url', label: 'URL', },
                 { key: 'username', label: 'Username' },
             ]
-            get('/passwords')
-                .then(x => x.json())
-                .then(x => me.appendChild(
-                    Table(
-                        Object.entries(x).map(([k, v]) => ({ ...v, uuid: k })),
-                        fields
-                    ).onrowclick(x => main_view.set_view(NewPassword(x)))
-                ))
-            return me
+            get('/passwords').then(x => x.json()).then(x => me.data(x))
+            return extend(me, PasswordListing.prototype)
+        }
+        PasswordListing.prototype.data = function(x) {
+            this._data = x
+            return this.render()
+        }
+
+        PasswordListing.prototype.render = function() {
+            empty(this)
+            let data = Object.entries(this._data).map(([k, v]) => ({ ...v, uuid: k }))
+            if (this._search)
+                data = data.filter(x =>
+                    [x.title, x.url, x.username]
+                    .map(x => x.toLowerCase())
+                    .some(has(this._search.toLowerCase())))
+            if (data.length === 0) return this
+            this.appendChild(
+                Table(data, this.fields)
+                .onrowclick(x => main_view.set_view(NewPassword(x)))
+            )
+            return this
+        }
+        PasswordListing.prototype.search = function(text) {
+            this._search = text
+            return this.render()
         }
 
         window.onload = main
