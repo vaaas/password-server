@@ -123,6 +123,7 @@
         }
 
         .pointer { cursor: pointer; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -156,6 +157,8 @@
             })
         }
 
+        const tap = f => x => { f(x) ; return x }
+        const print = tap(console.log)
         const pluck = k => x => x[k]
         const has = a => b => b.includes(a)
         const inside = a => b => a.includes(b)
@@ -212,10 +215,10 @@
                 if (typeof main_view.view.search === 'function')
                     main_view.view.search(x)
             })
-            const main_view = MainView().set_view(PasswordListing())
+            const main_view = MainView().to('PasswordListing', true)
             self.main_view = main_view
 
-            header_bar.new_password.onclick = () => main_view.set_view(NewPassword())
+            header_bar.new_password.onclick = () => main_view.to('NewPassword')
 
             elem.appendChild(header_bar)
             elem.appendChild(main_view)
@@ -235,17 +238,33 @@
             return this
         }
 
-        function MainView() {
-            const me = E('main')
+        function ViewSwitcher(xs, name='div') {
+            const me = E(name)
+            me.views = xs
             me.view = null
-            return extend(me, MainView.prototype)
+            return extend(me, ViewSwitcher.prototype)
         }
-        MainView.prototype.set_view = function(x) {
-            if (this.view) this.view.remove()
-            this.view = x
-            if (this.view instanceof Node)
-                this.appendChild(this.view)
+        ViewSwitcher.prototype.to = function(x, ...args) {
+            if (!x in this.views) return this
+            if (typeof this.views[x] === 'function') {
+                this.views[x] = this.views[x]()
+                this.appendChild(this.views[x])
+            }
+            if (this.view) {
+                if (typeof this.view.deactivate === 'function') this.view.deactivate()
+                this.view.classList.add('hidden')
+            }
+            this.view = this.views[x]
+            if (typeof this.view.activate === 'function') this.view.activate(...args)
+            this.view.classList.remove('hidden')
             return this
+        }
+
+        function MainView() {
+            return ViewSwitcher({
+                PasswordListing,
+                NewPassword,
+            }, 'main')
         }
 
         function LabelForm(label, form) {
@@ -276,21 +295,24 @@
             this.cancel.onclick = f
             return this
         }
+        CreateForm.prototype.setUpdate = function(x) {
+            this.save.innerText = x ? 'Update' : 'save'
+            return this
+        }
 
-        function NewPassword(data=null) {
-            update = data !== null
+        function NewPassword() {
             const me = CreateForm([
-                LabelForm('Title', E('input', { type: 'text', value: data ? data.title : '' })),
-                LabelForm('Username', E('input', { type: 'text', value: data ? data.username : '' })),
-                LabelForm('Password', E('input', { type: 'text', value: data ? data.password : '' })),
-                LabelForm('URL', E('input', { type: 'text', value: data ? data.url : '' })),
-                LabelForm('Notes', E('input', { type: 'text', value: data ? data.notes : '' })),
-                LabelForm('Group', E('input', { type: 'text', value: data ? data.group : '' })),
-            ], update)
-            .oncancel(() => main_view.set_view(PasswordListing()))
+                LabelForm('Title', E('input', { type: 'text' })),
+                LabelForm('Username', E('input', { type: 'text' })),
+                LabelForm('Password', E('input', { type: 'text' })),
+                LabelForm('URL', E('input', { type: 'text' })),
+                LabelForm('Notes', E('input', { type: 'text' })),
+                LabelForm('Group', E('input', { type: 'text' })),
+            ])
+            .oncancel(() => main_view.to('PasswordListing'))
             .onsave(() => me.save_password())
-            me.update = update
-            me.data = data
+            me.update = false
+            me.data = null
             return extend(me, NewPassword.prototype)
         }
         NewPassword.prototype.save_password = async function() {
@@ -298,10 +320,21 @@
             this.saving = true
             const [title, username, password, url, notes, group ] = Array.from(this.querySelectorAll('input')).map(pluck('value'))
             const data = { title, username, password, url, notes, group }
-            if (update) await put('/passwords/' + this.data.uuid, data)
+            if (this.update) await put('/passwords/' + this.data.uuid, data)
             else await post('/passwords', data)
             this.saving = false
-            main_view.set_view(PasswordListing())
+            main_view.to('PasswordListing', true)
+        }
+        NewPassword.prototype.activate = function(data) {
+            console.log(data)
+            this.update = Boolean(data)
+            this.data = data
+            const ks = [ 'title', 'username', 'password', 'url', 'notes', 'group' ]
+            let i = 0
+            for (const x of this.querySelectorAll('input'))
+                x.value = this.data ? (this.data[ks[i++]] || '') : ''
+            this.setUpdate(this.update)
+            return this
         }
 
         function Table(data, fields=null) {
@@ -337,14 +370,16 @@
                 { key: 'url', label: 'URL', },
                 { key: 'username', label: 'Username' },
             ]
-            get('/passwords').then(x => x.json()).then(x => me.data(x))
             return extend(me, PasswordListing.prototype)
+        }
+        PasswordListing.prototype.activate = function(x) {
+            if (x)
+                get('/passwords').then(x => x.json()).then(x => this.data(x))
         }
         PasswordListing.prototype.data = function(x) {
             this._data = x
             return this.render()
         }
-
         PasswordListing.prototype.render = function() {
             empty(this)
             let data = Object.entries(this._data).map(([k, v]) => ({ ...v, uuid: k }))
@@ -365,7 +400,7 @@
                         [ Table(
                             data.filter(x => x.group === g),
                             this.fields
-                        ).onrowclick(x => main_view.set_view(NewPassword(x))) ]
+                        ).onrowclick(x => main_view.to('NewPassword', x)) ]
                     )
                 )
             }
