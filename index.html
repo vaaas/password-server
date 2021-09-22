@@ -105,10 +105,24 @@
             background: #ccc;
             border: var(--border);
         }
-        table td {
-            background: #eee;
-            padding: 0.25em;
+        table td { padding: 0.25em; }
+
+        table tbody tr:hover { background: #fff; }
+
+        .accordion > header {
+            background: #ccc;
+            border: var(--border);
+            padding: 0.5em;
+            cursor: pointer;
         }
+        .accordion > div { display: none; }
+        .accordion.open > div {
+            display: block;
+            padding-left: 1em;
+            border-left: var(--border);
+        }
+
+        .pointer { cursor: pointer; }
     </style>
 </head>
 <body>
@@ -271,6 +285,7 @@
                 LabelForm('Password', E('input', { type: 'text', value: data ? data.password : '' })),
                 LabelForm('URL', E('input', { type: 'text', value: data ? data.url : '' })),
                 LabelForm('Notes', E('input', { type: 'text', value: data ? data.notes : '' })),
+                LabelForm('Group', E('input', { type: 'text', value: data ? data.group : '' })),
             ], update)
             .oncancel(() => main_view.set_view(PasswordListing()))
             .onsave(() => me.save_password())
@@ -281,8 +296,8 @@
         NewPassword.prototype.save_password = async function() {
             if (this.saving) return
             this.saving = true
-            const [title, username, password, url, notes ] = Array.from(this.querySelectorAll('input')).map(pluck('value'))
-            const data = { title, username, password, url, notes }
+            const [title, username, password, url, notes, group ] = Array.from(this.querySelectorAll('input')).map(pluck('value'))
+            const data = { title, username, password, url, notes, group }
             if (update) await put('/passwords/' + this.data.uuid, data)
             else await post('/passwords', data)
             this.saving = false
@@ -308,8 +323,10 @@
             return extend(me, Table.prototype)
         }
         Table.prototype.onrowclick = function(f) {
-            for (const x of this.querySelectorAll('tbody tr'))
+            for (const x of this.querySelectorAll('tbody tr')) {
                 x.onclick = () => f(x.item)
+                x.classList.add('pointer')
+            }
             return this
         }
 
@@ -338,15 +355,37 @@
                     .some(has(this._search.toLowerCase())))
             if (data.length === 0) return this
             data = data.sort(by(x => x.title))
-            this.appendChild(
-                Table(data, this.fields)
-                .onrowclick(x => main_view.set_view(NewPassword(x)))
-            )
+            const groups = Array.from(new Set(data.map(pluck('group')))).sort()
+
+            for (const g of groups) {
+                const title = g === '' ? 'No group' : g
+                this.appendChild(
+                    Accordion(
+                        title,
+                        [ Table(
+                            data.filter(x => x.group === g),
+                            this.fields
+                        ).onrowclick(x => main_view.set_view(NewPassword(x))) ]
+                    )
+                )
+            }
+
             return this
         }
         PasswordListing.prototype.search = function(text) {
             this._search = text
             return this.render()
+        }
+
+        function Accordion(title, contents) {
+            const body = E('div', null, contents)
+            const header = E('header', { onclick: () => me.toggle() }, [ title ])
+            const me = E('div', { class: 'accordion' }, [ header, body ])
+            return extend(me, Accordion.prototype)
+        }
+        Accordion.prototype.toggle = function() {
+            this.classList.toggle('open')
+            return this
         }
 
         window.onload = main
