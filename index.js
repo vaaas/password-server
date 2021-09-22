@@ -23,6 +23,11 @@ async function request_listener(request, socket) {
     }
 }
 
+const authorise = f => request => {
+    if (request.headers.password !== CONF.password) throw 'unauthorised'
+    else return f(request)
+}
+
 function internal_error(e) {
     console.error(e)
     return {
@@ -68,26 +73,21 @@ async function router(request) {
         case 'GET':
             if (request.url === '/')
                 return serve_file('index.html')
-            else if (request.url === '/passwords') {
-                authorise(request)
+            else if (request.url === '/passwords')
                 return list_passwords(request)
-            } else if (request.url.startsWith('/passwords/')) {
-                authorise(request)
-                return fetch_password(request)
-            } else return not_found()
+            // else if (request.url.startsWith('/passwords/'))
+            //     return fetch_password(request)
+            else return not_found()
         case 'POST':
-            if (request.url === '/passwords') {
-                authorise(request)
+            if (request.url === '/passwords')
                 return create_password(request)
-            } else if (request.url === '/authorise') {
-                authorise(request)
-                return { status: 200, headers: { 'Content-Type': 'text/plain' }, data: 'authorised' }
-            } else return method_not_allowed()
+            else if (request.url === '/authorise')
+                return test_authorise(request)
+            else return method_not_allowed()
         case 'PUT':
-            if (request.url.startsWith('/passwords/')) {
-                authorise(request)
+            if (request.url.startsWith('/passwords/'))
                 return upsert_password(request)
-            } else return method_not_allowed()
+            else return method_not_allowed()
     }
 }
 
@@ -124,7 +124,7 @@ function read_post_data(request) {
     })
 }
 
-async function create_password(request) {
+const create_password = authorise(async function create_password(request) {
     const data = await read_post_data(request)
     const pathname = 'passwords/' + crypto.randomUUID()
     fs.writeFileSync(pathname, data)
@@ -133,9 +133,9 @@ async function create_password(request) {
         headers: { 'Content-Type': 'text/plain' },
         data: 'Created ' + pathname,
     }
-}
+})
 
-async function upsert_password(request) {
+const upsert_password = authorise(async function upsert_password(request) {
     const data = await read_post_data(request)
     const uuid = request.url.slice('/passwords/'.length)
     const pathname = 'passwords/' + uuid
@@ -145,9 +145,9 @@ async function upsert_password(request) {
         headers: { 'Content-Type': 'text/plain' },
         data: 'Updated ' + pathname,
     }
-}
+})
 
-function list_passwords() {
+const list_passwords = authorise(function list_passwords() {
     const files = Object.fromEntries(
         fs.readdirSync('passwords')
         .map(x => [x, JSON.parse(fs.readFileSync('passwords/' + x).toString()) ]))
@@ -156,10 +156,6 @@ function list_passwords() {
         headers: { 'Content-Type': 'application/json' },
         data: JSON.stringify(files)
     }
-}
+})
 
-function authorise(request) {
-    if (request.headers.password !== CONF.password)
-        throw 'unauthorised'
-    else return true
-}
+const test_authorise = authorise(() => ({ status: 200, headers: { 'Content-Type': 'text/plain' }, data: 'authorised' }))
