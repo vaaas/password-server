@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf8'>
+    <title>Password Server</title>
+    <style>
+        :root {
+            --border: 1px solid rgba(0,0,0,0.25);
+        }
+
+        html {
+            min-height: 100vh;
+            background: #ccc;
+            color: #444;
+            font-family: sans-serif;
+            font-size: 16px;
+            max-width: 60em;
+            margin: auto;
+            border-left: var(--border);
+            border-right: var(--border);
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #eee;
+        }
+
+        body > header:first-of-type {
+            display: flex;
+            align-items: center;
+            background: #ddd;
+            padding: 5px 10px;
+            border-bottom: 2px solid rgba(0,0,0,0.25);
+        }
+
+        body > header:first-of-type > h1 {
+            flex: 1;
+            text-align: center;
+            font-size: 1rem;
+            margin: 0;
+        }
+
+        button {
+            display: block;
+            padding: 0.5em 1em;
+            background: linear-gradient(to bottom, #eee, #ddd);
+            border: var(--border);
+            border-radius: 0.25em;
+        }
+        button:hover, button:focus { background: #eee; }
+        button:active { background: #ddd; }
+
+        button.primary { background: linear-gradient(to bottom, #4be, #3ad); }
+        button.primary:hover, button.primary:focus { background: #4be; }
+        button.primary:active { background: #3ad; }
+
+        input[type='text'] {
+            border: var(--border);
+            font-size: 0.9rem;
+            margin: 0;
+            border-radius: 0.25em;
+            padding: 0.25em 0.5em;
+        }
+
+        main {
+            padding: 1em;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+        }
+
+        .row.evenly { justify-content: space-evenly; }
+        .row.end { justify-content: flex-end; }
+        .row.g1 { gap: 0.25em; }
+
+        .labelform {
+            display: flex;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .labelform > label {
+            width: 10em;
+            text-align: left;
+        }
+        .labelform > input { width: 100%; }
+
+        .center { text-align: center; }
+
+        .centered { margin-left: auto; margin-right: auto; }
+
+        table {
+            width: 100%;
+            border-spacing: 0px;
+            border-collapse: collapse;
+        }
+        table th {
+            text-align: left;
+            padding: 0.25em;
+            margin-bottom: 0.5em;
+        }
+        table thead {
+            background: #ccc;
+            border: var(--border);
+        }
+        table td {
+            background: #eee;
+            padding: 0.25em;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        let password = null
+
+        function post(url, data) {
+            return fetch(url, {
+                method: 'POST',
+                headers: { password: password },
+                body: typeof data === 'object' ? JSON.stringify(data) : data+''
+            })
+        }
+
+        function put(url, data) {
+            return fetch(url, {
+                method: 'PUT',
+                headers: { password: password },
+                body: typeof data === 'object' ? JSON.stringify(data) : data+''
+            })
+        }
+
+        function get(url) {
+            return fetch(url, {
+                headers: { password: password },
+            })
+        }
+
+        const pluck = k => x => x[k]
+
+        function E(name, attrs=null, children=null) {
+            const elem = document.createElement(name)
+
+            if (attrs) for (const [k, v] of Object.entries(attrs))
+                switch (k) {
+                    case 'class':
+                        elem.className = v
+                        break
+                    default:
+                        elem[k] = v
+                        break
+                }
+
+            if (children) for (const x of children)
+                if (x instanceof Node)
+                    elem.appendChild(x)
+                else
+                    elem.appendChild(document.createTextNode(str(x)))
+
+            return elem
+        }
+
+        function str(x) { return ''+x }
+
+        function extend(o, ...xs) {
+            for (const x of xs)
+                for (const [k, v] of Object.entries(x))
+                    o[k] = v
+            return o
+        }
+
+        async function main() {
+            await authorise()
+            App(document.body)
+        }
+
+        async function authorise() {
+            while(true) {
+                const x = prompt('Password')
+                if (!x) continue
+                password = x
+                const response = await post('/authorise', '')
+                if (response.status === 200) break
+            }
+        }
+
+        function App(elem) {
+            const header_bar = HeaderBar()
+            const main_view = MainView().set_view(PasswordListing())
+            self.main_view = main_view
+
+            header_bar.new_password.onclick = () => main_view.set_view(NewPassword())
+
+            elem.appendChild(header_bar)
+            elem.appendChild(main_view)
+        }
+
+        function HeaderBar() {
+            const new_password = E('button', null, [ 'New Password' ])
+            const title = E('h1', null, [ 'Password Server' ])
+            const input = E('input', { type: 'text' })
+            const me = E('header', null, [ new_password, title, input ])
+            me.new_password = new_password
+            me.input = input
+            return me
+        }
+
+        function MainView() {
+            const me = E('main')
+            me.view = null
+            return extend(me, MainView.prototype)
+        }
+        MainView.prototype.set_view = function(x) {
+            if (this.view) this.view.remove()
+            this.view = x
+            if (this.view instanceof Node)
+                this.appendChild(this.view)
+            return this
+        }
+
+        function LabelForm(label, form) {
+            const me = E('div', { class: 'labelform' }, [
+                E('label', null, [ label ]),
+                form
+            ])
+            me.form = form
+            return me
+        }
+
+        function CreateForm(items, update=false) {
+            const cancel = E('button', { class: 'right' }, [ 'Cancel' ])
+            const save = E('button', { class: 'right primary' }, [ update ? 'Update' : 'Create' ])
+            const me = E('div', { class: 'centered', style: 'max-width: 30em;' }, [
+                ...items,
+                E('div', { class: 'row end g1' }, [ cancel, save, ])
+            ])
+            me.cancel = cancel
+            me.save = save
+            return extend(me, CreateForm.prototype)
+        }
+        CreateForm.prototype.onsave = function(f) {
+            this.save.onclick = f
+            return this
+        }
+        CreateForm.prototype.oncancel = function(f) {
+            this.cancel.onclick = f
+            return this
+        }
+
+        function NewPassword(data=null) {
+            update = data !== null
+            const me = CreateForm([
+                LabelForm('Title', E('input', { type: 'text', value: data ? data.title : '' })),
+                LabelForm('Username', E('input', { type: 'text', value: data ? data.username : '' })),
+                LabelForm('Password', E('input', { type: 'text', value: data ? data.password : '' })),
+                LabelForm('URL', E('input', { type: 'text', value: data ? data.url : '' })),
+                LabelForm('Notes', E('input', { type: 'text', value: data ? data.notes : '' })),
+            ], update)
+            .oncancel(() => main_view.set_view(PasswordListing()))
+            .onsave(() => me.save_password())
+            me.update = update
+            me.data = data
+            return extend(me, NewPassword.prototype)
+        }
+        NewPassword.prototype.save_password = async function() {
+            if (this.saving) return
+            this.saving = true
+            const [title, username, password, url, notes ] = Array.from(this.querySelectorAll('input')).map(pluck('value'))
+            const data = { title, username, password, url, notes }
+            if (update) await put('/passwords/' + this.data.uuid, data)
+            else await post('/passwords', data)
+            this.saving = false
+            main_view.set_view(PasswordListing())
+        }
+
+        function Table(data, fields=null) {
+            if (!fields) fields = Object.keys(data[0]).map(x => ({ key: x, label: x }))
+
+            const rows = data.map(x => {
+                const row = E('tr', null, fields.map(k => E('td', null, [ x[k.key] ])))
+                row.item = x
+                return row
+            })
+
+            const me = E('table', null, [
+                E('thead', null, [
+                    E('tr', null, fields.map(x => E('th', null, [ x.label ])))
+                ]),
+                E('tbody', null, rows)
+            ])
+
+            return extend(me, Table.prototype)
+        }
+        Table.prototype.onrowclick = function(f) {
+            for (const x of this.querySelectorAll('tbody tr'))
+                x.onclick = () => f(x.item)
+            return this
+        }
+
+        function PasswordListing() {
+            const me = E('div')
+            const fields = [
+                { key: 'title', label: 'Title', },
+                { key: 'url', label: 'URL', },
+                { key: 'username', label: 'Username' },
+            ]
+            get('/passwords')
+                .then(x => x.json())
+                .then(x => me.appendChild(
+                    Table(
+                        Object.entries(x).map(([k, v]) => ({ ...v, uuid: k })),
+                        fields
+                    ).onrowclick(x => main_view.set_view(NewPassword(x)))
+                ))
+            return me
+        }
+
+        window.onload = main
+    </script>
+</body>
+</html>
