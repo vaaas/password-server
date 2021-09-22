@@ -145,6 +145,7 @@
         const pluck = k => x => x[k]
         const has = a => b => b.includes(a)
         const inside = a => b => a.includes(b)
+        const by = f => (a, b) => f(a) < f(b) ? -1 : 1
 
         function E(name, attrs=null, children=null) {
             const elem = document.createElement(name)
@@ -336,6 +337,7 @@
                     .map(x => x.toLowerCase())
                     .some(has(this._search.toLowerCase())))
             if (data.length === 0) return this
+            data = data.sort(by(x => x.title))
             this.appendChild(
                 Table(data, this.fields)
                 .onrowclick(x => main_view.set_view(NewPassword(x)))
