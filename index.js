@@ -72,12 +72,10 @@ async function router(request) {
     switch (request.method) {
         case 'GET':
             if (request.url === '/')
-                return serve_file('index.html')
+                return serve_file('./public/index.html')
             else if (request.url === '/passwords')
                 return list_passwords(request)
-            // else if (request.url.startsWith('/passwords/'))
-            //     return fetch_password(request)
-            else return not_found()
+            else return serve_file('./public' + request.url)
         case 'POST':
             if (request.url === '/passwords')
                 return create_password(request)
@@ -109,11 +107,14 @@ function guess_mime_type(pathname) {
 }
 
 function serve_file(pathname) {
-    return {
-        status: 200,
-        headers: { 'Content-Type': guess_mime_type(pathname) },
-        data: fs.readFileSync(pathname)
-    }
+    try {
+        fs.accessSync(pathname, fs.constants.R_OK)
+        return {
+            status: 200,
+            headers: { 'Content-Type': guess_mime_type(pathname) },
+            data: fs.readFileSync(pathname)
+        }
+    } catch (e) { return not_found() }
 }
 
 function read_post_data(request) {

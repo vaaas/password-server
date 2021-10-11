@@ -1,2 +1,5 @@
 passwords
 conf.json
+public/index.js
+node_modules
+package-lock.json
