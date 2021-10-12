@@ -1,5 +1,5 @@
 <template>
-    <CreationForm @create='creation' @cancel='cancellation' :update='Boolean(data)'>
+    <CreationForm style='max-width: 30rem' @create='creation' @cancel='cancellation' :update='Boolean(data)'>
         <LabelForm label='Title'>
             <input type='text' v-model='title'/>
         </LabelForm>
@@ -34,7 +34,8 @@
         components: { CreationForm, LabelForm },
 
         props: {
-            data: { required: false, },
+            data: { required: false, default: null, },
+            root: { required: true, type: Object },
         },
 
         data() { return {
@@ -46,6 +47,24 @@
             group: '',
             saving: false,
         }},
+
+        activated() {
+            if (this.data) {
+                this.title = this.data.title || ''
+                this.username = this.data.username || ''
+                this.password = this.data.password || ''
+                this.url = this.data.url || ''
+                this.notes = this.data.notes || ''
+                this.group = this.data.group || ''
+            } else {
+                this.title = ''
+                this.username = ''
+                this.password = ''
+                this.url = ''
+                this.notes = ''
+                this.group = ''
+            }
+        },
 
         methods: {
             async creation() {
@@ -61,12 +80,16 @@
                 }
 
                 if (this.data)
-                    await put('/passwords/' + this.data.uuid, data)
+                    await this.root.put('/passwords/' + this.data.uuid, data)
                 else
-                    await post('/passwords', data)
+                    await this.root.post('/passwords', data)
 
                 this.saving = false
-                this.root.route('PasswordListing', true)
+                this.root.route('PasswordListing', { reload: true })
+            },
+
+            cancellation() {
+                this.root.route('PasswordListing')
             },
         },
     }

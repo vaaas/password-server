@@ -10,11 +10,15 @@
         display: flex;
         margin-top: 0.5rem;
         margin-bottom: 0.5rem;
+        border: none;
+        outline: none;
     }
+
     .labelform > label {
         width: 10em;
         text-align: left;
     }
+
     .labelform > input { width: 100%; }
 </style>
 

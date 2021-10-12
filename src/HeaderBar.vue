@@ -2,7 +2,7 @@
     <header class='headerbar'>
         <button @click='root.route("NewPassword", { search: root.search })'>New Password</button>
         <h1>Password Server</h1>
-        <input type='text' :value='modelValue' @input='$emit("update:modelValue", $event.target.value)'/>
+        <input type='text' v-model='root.search'/>
     </header>
 </template>
 
@@ -26,7 +26,6 @@
 <script>
     export default {
         props: {
-            modelValue: { required: true, type: String },
             root: { required: true, type: Object },
         },
     }

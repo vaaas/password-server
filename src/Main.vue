@@ -1,8 +1,10 @@
 <template>
     <div v-if='password'>
-        <HeaderBar :root='this' v-model='search'/>
+        <HeaderBar :root='this'/>
         <main>
-            <component :is='component' v-bind='bound_props'/>
+            <keep-alive>
+                <component :is='component' v-bind='bound_props'/>
+            </keep-alive>
         </main>
     </div>
 </template>
@@ -64,15 +66,13 @@
     import NewPassword from './NewPassword.vue'
 
 	export default {
-		data() {
-            const me = {}
-			me.test = 'Hello, world!'
-            me.password = null
-            me.search = ''
-            me.component = 'PasswordListing'
-            me.bound_props = { root: this, search: me.search }
-            return me
-		},
+		data() { return {
+			test: 'Hello, world!',
+            password: null,
+            search: '',
+            component: 'PasswordListing',
+            bound_props: { root: this },
+		}},
 
         async mounted() {
             this.password = await this.authorise()
