@@ -1,6 +1,7 @@
 const http = require('http')
 const fs = require('fs')
 const crypto = require('crypto')
+const zlib = require('zlib')
 let CONF = {}
 
 main()
@@ -54,8 +55,11 @@ function method_not_allowed() {
 }
 
 function serve(socket, response) {
+    response.headers['content-encoding'] = 'gzip'
     socket.writeHead(response.status, response.headers)
-    socket.end(response.data)
+    const gzip = zlib.createGzip({ level: 9 })
+    gzip.end(response.data)
+    gzip.pipe(socket)
 }
 
 function parse_url(request) {
