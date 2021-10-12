@@ -55,11 +55,8 @@ function method_not_allowed() {
 }
 
 function serve(socket, response) {
-    response.headers['content-encoding'] = 'gzip'
     socket.writeHead(response.status, response.headers)
-    const gzip = zlib.createGzip({ level: 9 })
-    gzip.end(response.data)
-    gzip.pipe(socket)
+    socket.end(response.data)
 }
 
 function parse_url(request) {
@@ -101,6 +98,7 @@ function file_extension(pathname) {
 
 const MIMES = {
     'html': 'text/html',
+    'js': 'text/javascript',
 }
 
 function guess_mime_type(pathname) {
