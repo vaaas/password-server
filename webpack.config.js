@@ -1,7 +1,7 @@
 const { VueLoaderPlugin } = require('vue-loader')
 const path = require('path')
 module.exports = {
-	mode: 'development',
+	mode: 'production',
 	entry: [ './src/index.js' ],
 	output: {
 		filename: 'index.js',
