@@ -17,7 +17,7 @@
         </LabelForm>
 
         <LabelForm label='Notes'>
-            <input type='text' v-model='notes'/>
+            <textarea rows='5' v-model='notes'></textarea>
         </LabelForm>
 
         <LabelForm label='Group'>

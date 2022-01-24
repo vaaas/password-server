@@ -19,7 +19,8 @@
         text-align: left;
     }
 
-    .labelform > input { width: 100%; }
+    .labelform > input,
+    .labelform > textarea { width: 100% !important; }
 </style>
 
 <script>
