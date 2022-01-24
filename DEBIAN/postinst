@@ -1,0 +1,3 @@
+#!/bin/sh
+chown -R www-data:www-data /opt/password-server
+systemctl restart password-server
